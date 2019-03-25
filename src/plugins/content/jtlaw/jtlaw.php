@@ -12,6 +12,7 @@
 defined('_JEXEC') or die;
 
 use Joomla\CMS\Language\Text;
+use Joomla\CMS\Profiler\Profiler;
 
 JLoader::import('joomla.filesystem.file');
 JLoader::import('joomla.filesystem.folder');
@@ -84,9 +85,22 @@ class PlgContentJtlaw extends JPlugin
 		{
 			return;
 		}
+		// Startzeit und Speichernutzung für Auswertung
+		$startTime = microtime(1);
 
-		$cachePath                    = JPATH_PLUGINS . '/content/jtlaw/cache';
-		$cacheOnOff                   = filter_var($this->params->get('cache', 1), FILTER_VALIDATE_BOOLEAN);
+		$debug = $this->params->get('debug', 0) == '0' ? true : false;
+
+		if ($debug)
+		{
+			Profiler::getInstance('JT - Easylink (' . $context . ')')->setStart($startTime);
+		}
+
+		$cachePath  = JPATH_CACHE . '/plg_content_jtlaw';
+		$cacheOnOff = filter_var(
+			$this->params->get('cache', 1),
+			FILTER_VALIDATE_BOOLEAN
+		);
+
 		$this->plgParams['server']    = rtrim($this->params->get('server'), '\\/');
 		$this->plgParams['cachetime'] = (int) $this->params->get('cachetime', 1440) * 60;
 
@@ -95,9 +109,9 @@ class PlgContentJtlaw extends JPlugin
 			$this->message['warning'][] = Text::_('PLG_CONTENT_JTLAW_WARNING_NO_SERVER');
 		}
 
-		if ($this->plgParams['cachetime'] < '600')
+		if ($this->plgParams['cachetime'] < '3600')
 		{
-			$this->plgParams['cachetime'] = '600';
+			$this->plgParams['cachetime'] = '3600';
 		}
 
 		if ($cacheOnOff === false)
@@ -112,9 +126,9 @@ class PlgContentJtlaw extends JPlugin
 
 		$plgCalls = $this->getPlgCalls($article->text);
 
-		foreach ($plgCalls as $plgCall)
+		foreach ($plgCalls[0] as $key => $plgCall)
 		{
-			$fileName  = strtolower($plgCall[3]) . '.html';
+			$fileName  = strtolower($plgCalls[1][$key]) . '.html';
 			$cacheFile = $cachePath . '/' . $fileName;
 
 			if ($useCacheFile = JFile::exists($cacheFile))
@@ -123,22 +137,30 @@ class PlgContentJtlaw extends JPlugin
 			}
 
 			$this->setBuffer($cacheFile, $useCacheFile);
-			$article->text = str_replace($plgCall[0], $this->buffer, $article->text);
+			$article->text = str_replace($plgCall, $this->buffer, $article->text);
 			$this->buffer  = null;
 		}
 
-		if (JDEBUG && !empty($this->message))
+		if ($debug)
 		{
-			foreach ($this->message as $type => $msgs)
+			if (!empty($this->message))
 			{
-				if ($type == 'error')
+				foreach ($this->message as $type => $msgs)
 				{
-					$msgs[] = Text::_('PLG_CONTENT_JTLAW_ERROR_CHECKLIST');
-				}
+					if ($type == 'error')
+					{
+						$msgs[] = Text::_('PLG_CONTENT_JTEASYLINK_ERROR_CHECKLIST');
+					}
 
-				$msg = implode('<br />', $msgs);
-				$this->app->enqueueMessage($msg, $type);
+					$msg = implode('<br />', $msgs);
+					$this->app->enqueueMessage($msg, $type);
+				}
 			}
+
+			$this->app->enqueueMessage(
+				Profiler::getInstance('JT - Easylink (' . $context . ')')->mark('Verarbeitungszeit'),
+				'info'
+			);
 		}
 	}
 
@@ -152,22 +174,49 @@ class PlgContentJtlaw extends JPlugin
 	 */
 	protected function getPlgCalls($text)
 	{
-		$regex = '@(<(\w*+)[^>]*>|){jtlaw\s(.*)}(</\\2>|)@siU';
-		$p1    = preg_match_all($regex, $text, $matches, PREG_SET_ORDER);
+		$regex = '@(<(\w*+)[^>]*>)\s?{jtlaw\s(.*)}.*(</\2>)|{jtlaw\s(.*)}@iU';
+		$p1    = preg_match_all($regex, $text, $matches);
 
 		if ($p1)
 		{
-			foreach ($matches as $key => $match)
-			{
-				$closeTag = ($match[2] != '') ? strpos($match[4], $match[2]) : true;
+			// Exclude <code/> and <pre/> matches
+			$code = array_keys($matches[1], '<code>');
+			$pre  = array_keys($matches[1], '<pre>');
 
-				if (!$closeTag)
+			if (!empty($code) || !empty($pre))
+			{
+				array_walk($matches,
+					function (&$array, $key, $tags) {
+						foreach ($tags as $tag)
+						{
+							if ($tag !== null && $tag !== false)
+							{
+								unset($array[$tag]);
+							}
+						}
+					}, array_merge($code, $pre)
+				);
+			}
+
+			$options = [];
+
+			foreach ($matches[0] as $key => $value)
+			{
+				if (!empty($matches[3][$key]))
 				{
-					$matches[$key][0] = str_replace($match[1], '', $match[0]);
+					$options[$key] = trim($matches[3][$key]);
+				}
+
+				if (empty($matches[3][$key]) && !empty($matches[5][$key]))
+				{
+					$options[$key] = trim($matches[5][$key]);
 				}
 			}
 
-			return $matches;
+			return array(
+				$matches[0],
+				$options,
+			);
 		}
 
 		return array();

@@ -8,17 +8,13 @@
 	<copyright>Copyright (C) ##YEAR## JoomTools.de. All rights reserved.</copyright>
 	<license>GPL v3</license>
 	<version>##VERSION##</version>
-	<description>PLG_CONTENT_JTLAW_DESC</description>
+	<description>PLG_CONTENT_JTLAW_DESC,##VERSION##</description>
 
 	<files>
 		##FILES##
 	</files>
 
 	<scriptfile>script.php</scriptfile>
-
-	<languages folder="language">
-		##LANGUAGE_FILES##
-	</languages>
 
 	<config>
 		<fields name="params">
@@ -28,7 +24,9 @@
 				       type="url"
 				       default=""
 				       label="PLG_CONTENT_JTLAW_SERVER_LABEL"
-				       description="PLG_CONTENT_JTLAW_SERVER_DESC"/>
+				       description="PLG_CONTENT_JTLAW_SERVER_DESC"
+				       validate="url"
+				/>
 				<field name="cache"
 				       type="radio"
 				       class="btn-group btn-group-yesno"
@@ -43,9 +41,22 @@
 				       default="1440"
 				       label="PLG_CONTENT_JTLAW_CACHETIME_LABEL"
 				       description="PLG_CONTENT_JTLAW_CACHETIME_DESC"
-				       validate=""
+				       filter="int"
 				       showon="cache:1"
 				/>
+
+				<field name="spacer1" type="spacer" hr="true"/>
+
+				<field name="debug"
+				       type="radio"
+				       class="btn-group btn-group-yesno"
+				       default="0"
+				       label="PLG_CONTENT_JTLAW_DEBUG_LABEL"
+				       description="PLG_CONTENT_JTLAW_DEBUG_DESC"
+				>
+					<option value="1">JOFF</option>
+					<option value="0">JON</option>
+				</field>
 			</fieldset>
 
 		</fields>

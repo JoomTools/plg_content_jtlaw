@@ -1,5 +1,5 @@
 {
-  "name"       : "JoomTools/plg_content_jtlaw",
+  "name"       : "joomtools/plg_content_jtlaw",
   "description": "Insert and cache HTML files from Your own server",
   "license"    : "GPL-3+",
   "require"    : {
